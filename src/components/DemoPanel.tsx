@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useChat } from '@tanstack/ai-react'
+import { Activity, LoaderCircle, PanelRightOpen, TerminalSquare, WandSparkles } from 'lucide-react'
 import { clientToolset } from '../client-tools'
 import type { DemoDefinition } from '../demo-data'
 import type { ProgressEvent, TerminalSnapshot } from '../types'
 import { MessageView } from './MessageView'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Textarea } from './ui/textarea'
 
 interface DemoPanelProps {
   demo: DemoDefinition
@@ -89,23 +94,32 @@ export function DemoPanel({ demo }: DemoPanelProps) {
   }
 
   return (
-    <div className="demo-grid">
-      <div className="chat-card">
-        <div className="card-header">
-          <div>
-            <h3>{demo.title}</h3>
-            <p>{demo.summary}</p>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
+      <Card className="border-stone-200/80 bg-white/75">
+        <CardHeader className="border-b border-stone-200/80 pb-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <CardTitle>{demo.title}</CardTitle>
+              <CardDescription>{demo.summary}</CardDescription>
+            </div>
+            <Badge variant={chat.isLoading ? 'warning' : 'success'}>
+              {chat.isLoading ? (
+                <LoaderCircle className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Activity className="mr-1 h-3.5 w-3.5" />
+              )}
+              {chat.isLoading ? 'Streaming response' : 'Ready for input'}
+            </Badge>
           </div>
-          <div className="status-block">
-            <span className={`status-dot ${chat.isLoading ? 'busy' : 'idle'}`} />
-            <span>{chat.isLoading ? 'Streaming' : 'Ready'}</span>
-          </div>
-        </div>
+        </CardHeader>
 
-        <div className="message-list">
+        <CardContent className="space-y-5 pt-6">
+          <div className="max-h-[58vh] min-h-[420px] space-y-3 overflow-auto pr-1">
           {chat.messages.length === 0 ? (
-            <div className="empty-state">
-              <p>Try one of the prompt starters or type your own.</p>
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/80 px-6 py-12 text-center">
+              <p className="text-sm text-stone-600">
+                Try one of the prompt starters or type your own.
+              </p>
             </div>
           ) : null}
 
@@ -116,86 +130,127 @@ export function DemoPanel({ demo }: DemoPanelProps) {
               message={message}
             />
           ))}
-        </div>
+          </div>
 
-        <div className="composer">
-          <div className="suggestion-row">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
             {demo.suggestions.map((suggestion) => (
-              <button
-                className="suggestion"
+              <Button
+                className="h-auto rounded-full px-3 py-2 text-left text-xs leading-5"
                 key={suggestion}
                 onClick={() => setDraft(suggestion)}
                 type="button"
+                variant="outline"
               >
                 {suggestion}
-              </button>
+              </Button>
             ))}
-          </div>
+            </div>
 
-          <textarea
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                void handleSubmit()
-              }
-            }}
-            placeholder="Send a prompt. Cmd/Ctrl+Enter to submit."
-            rows={4}
-            value={draft}
-          />
+            <Textarea
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                  void handleSubmit()
+                }
+              }}
+              placeholder="Send a prompt. Cmd/Ctrl+Enter to submit."
+              rows={4}
+              value={draft}
+            />
 
-          <div className="composer-actions">
-            <button onClick={() => chat.clear()} type="button">
+            <div className="flex flex-col gap-3 border-t border-stone-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-stone-500">
+                Session: <span className="font-mono text-stone-700">{sessionId}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => chat.clear()} type="button" variant="ghost">
               Clear
-            </button>
-            <button onClick={() => chat.stop()} type="button">
+                </Button>
+                <Button onClick={() => chat.stop()} type="button" variant="outline">
               Stop
-            </button>
-            <button className="primary" onClick={() => void handleSubmit()} type="button">
+                </Button>
+                <Button onClick={() => void handleSubmit()} type="button">
               Send
-            </button>
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <aside className="inspector-column">
-        <div className="inspector-card">
-          <h3>Progress Events</h3>
+      <aside className="space-y-5">
+        <Card className="border-stone-200/80 bg-white/75">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <WandSparkles className="h-4 w-4 text-stone-500" />
+              <CardTitle className="text-lg">Progress Events</CardTitle>
+            </div>
+            <CardDescription>Live custom events emitted by server-side tools.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
           {events.length === 0 ? (
-            <p className="muted">No custom tool events yet.</p>
+            <p className="text-sm text-stone-500">No custom tool events yet.</p>
           ) : (
-            <div className="event-list">
+            <div className="space-y-3">
               {events.map((event, index) => (
-                <article className="event-item" key={`${event.receivedAt}-${index}`}>
-                  <strong>{event.eventType}</strong>
-                  <span>{event.toolCallId ?? 'no tool id'}</span>
-                  <pre>{JSON.stringify(event.data, null, 2)}</pre>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="inspector-card">
-          <h3>Background Terminals</h3>
-          {terminalSnapshots.length === 0 ? (
-            <p className="muted">No background terminal sessions.</p>
-          ) : (
-            <div className="terminal-list">
-              {terminalSnapshots.map((terminal) => (
-                <article className="terminal-item" key={terminal.id}>
-                  <div className="terminal-title">
-                    <strong>{terminal.id}</strong>
-                    <span>{terminal.status}</span>
+                <article
+                  className="rounded-xl border border-stone-200 bg-stone-50/70 p-4"
+                  key={`${event.receivedAt}-${index}`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Badge variant="outline">{event.eventType}</Badge>
+                    <span className="truncate font-mono text-[11px] text-stone-500">
+                      {event.toolCallId ?? 'no tool id'}
+                    </span>
                   </div>
-                  <code>{terminal.command}</code>
-                  <small>{terminal.cwd}</small>
-                  <pre>{terminal.recentOutput.join('\n') || '(no output yet)'}</pre>
+                  <pre className="overflow-x-auto rounded-lg bg-white p-3 text-xs leading-5 text-stone-700">
+                    {JSON.stringify(event.data, null, 2)}
+                  </pre>
                 </article>
               ))}
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-stone-200/80 bg-white/75">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <TerminalSquare className="h-4 w-4 text-stone-500" />
+              <CardTitle className="text-lg">Background Terminals</CardTitle>
+            </div>
+            <CardDescription>Stateful sessions owned by the agent-side tools.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+          {terminalSnapshots.length === 0 ? (
+            <p className="text-sm text-stone-500">No background terminal sessions.</p>
+          ) : (
+            <div className="space-y-3">
+              {terminalSnapshots.map((terminal) => (
+                <article className="rounded-xl border border-stone-200 bg-stone-50/70 p-4" key={terminal.id}>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="font-mono text-xs font-semibold text-stone-800">{terminal.id}</span>
+                    <Badge variant={terminal.status === 'running' ? 'warning' : 'success'}>
+                      {terminal.status}
+                    </Badge>
+                  </div>
+                  <div className="mb-1 flex items-center gap-2 text-xs text-stone-500">
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                    <code className="truncate">{terminal.command}</code>
+                  </div>
+                  <div className="mb-3 truncate font-mono text-[11px] text-stone-500">
+                    {terminal.cwd || '(default cwd)'}
+                  </div>
+                  <pre className="overflow-x-auto rounded-lg bg-white p-3 text-xs leading-5 text-stone-700">
+                    {terminal.recentOutput.join('\n') || '(no output yet)'}
+                  </pre>
+                </article>
+              ))}
+            </div>
+          )}
+          </CardContent>
+        </Card>
       </aside>
     </div>
   )
